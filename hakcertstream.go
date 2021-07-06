@@ -1,29 +1,33 @@
 package main
 
 import (
-	"github.com/CaliDog/certstream-go"
-	logging "github.com/op/go-logging"
+	"bufio"
 	"fmt"
+	"os"
 	"strings"
+
+	"github.com/CaliDog/certstream-go"
 )
 
-var log = logging.MustGetLogger("example")
-
 func main() {
+	w := bufio.NewWriter(os.Stdout)
+	defer w.Flush()
+
 	// The false flag specifies that we want heartbeat messages.
 	stream, errStream := certstream.CertStreamEventStream(false)
 	for {
 		select {
-			case jq := <-stream:
-				domains, err := jq.ArrayOfStrings("data", "leaf_cert", "all_domains")
-				if err != nil{
-					log.Fatal("Error decoding jq string")
-				}
+		case jq := <-stream:
+			domains, err := jq.ArrayOfStrings("data", "leaf_cert", "all_domains")
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "Error decoding json", err)
+			} else {
 				for _, domain := range domains {
-					fmt.Println(strings.Replace(domain, "*.", "", 1))
-				}	
-			case err := <-errStream:
-				log.Error(err)
+					fmt.Fprintln(w, strings.Replace(domain, "*.", "", 1))
+				}
+			}
+		case err := <-errStream:
+			fmt.Fprintln(os.Stderr, "Stream error", err)
 		}
 	}
 }
